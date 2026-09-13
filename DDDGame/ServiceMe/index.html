@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ServiceMe</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:#090709;color:#eee;font-family:system-ui,"Noto Sans TC",sans-serif}
+body{display:flex;justify-content:center;align-items:center;overflow:hidden}
+
+/* Fixed 9:15 virtual phone screen */
+#game{
+  position:relative;
+  width:min(100vw,66.6667vh);
+  height:min(100vh,150vw);
+  aspect-ratio:9/15;
+  overflow:hidden;
+  background:#100b0e url("cover_s.jpg") center center/cover no-repeat;
+}
+
+/* Dark overlay keeps the text readable */
+#game:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.38);
+  pointer-events:none;
+  z-index:1;
+}
+
+#top{
+  position:absolute;left:6%;right:6%;top:5%;
+  display:flex;justify-content:space-between;
+  z-index:5;font-size:12px;letter-spacing:.08em;
+  color:rgba(255,255,255,.72);
+  text-shadow:0 1px 5px #000;
+}
+#title{
+  position:absolute;top:11%;left:0;right:0;text-align:center;
+  z-index:5;font-size:24px;letter-spacing:.2em;
+  color:#fff;text-shadow:0 2px 12px #000;
+}
+#hint{
+  position:absolute;top:17%;left:10%;right:10%;text-align:center;
+  z-index:5;font-size:11px;line-height:1.8;
+  color:rgba(255,255,255,.62);text-shadow:0 1px 6px #000;
+}
+#field{position:absolute;inset:24% 5% 14%;overflow:hidden;z-index:4}
+
+.word{
+  position:absolute;padding:7px 10px;
+  border:1px solid rgba(255,255,255,.38);
+  border-radius:999px;
+  background:rgba(12,8,11,.68);
+  backdrop-filter:blur(2px);
+  color:#fff;font-size:13px;
+  cursor:pointer;user-select:none;white-space:nowrap;
+  text-shadow:0 1px 5px #000;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+  transition:opacity .2s,transform .15s;
+}
+.word.player{
+  border-color:rgba(205,180,255,.62);
+  background:rgba(39,25,52,.78);
+}
+.word.master{
+  border-color:rgba(255,105,105,.62);
+  background:rgba(52,17,20,.78);
+}
+.word.player:hover{border-color:rgba(225,205,255,.95)}
+.word.master:hover{border-color:rgba(255,145,145,.95)}
+.word:active{transform:scale(.92)}
+
+#bottom{
+  position:absolute;left:7%;right:7%;bottom:5%;
+  z-index:5;text-align:center;
+}
+#timer{height:4px;background:rgba(0,0,0,.55);border-radius:9px;overflow:hidden}
+#bar{height:100%;width:100%;background:#eee;transform-origin:left}
+#status{
+  margin-top:9px;font-size:11px;color:rgba(255,255,255,.65);
+  text-shadow:0 1px 5px #000;
+}
+
+#result{
+  position:absolute;inset:0;
+  background:rgba(5,3,5,.90);
+  z-index:20;display:none;
+  align-items:center;justify-content:center;
+  text-align:center;padding:15%;
+}
+#result h2{
+  font-size:13px;font-weight:400;letter-spacing:.15em;
+  color:#aaa;margin:0 0 28px;
+}
+#result p{font-size:22px;line-height:1.7;margin:0;color:#fff}
+#stats{display:block;margin-top:25px;color:#777;font-size:11px;line-height:1.8}
+button{
+  margin-top:25px;padding:10px 22px;
+  background:rgba(30,20,25,.9);color:#ddd;
+  border:1px solid #66525c;border-radius:7px;
+  cursor:pointer;
+}
+
+#copyright{
+  position:absolute;left:4%;right:4%;bottom:1.4%;z-index:6;
+  text-align:center;font-size:8px;letter-spacing:.04em;
+  color:rgba(255,255,255,.34);text-shadow:0 1px 4px #000;
+  pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+<div id="game">
+  <div id="copyright">© 2026 Derive Dimension Demon. All rights reserved.</div>
+  <div id="top">
+    <span>ServiceMe</span>
+    <span id="count">0 clicks</span>
+  </div>
+
+  <div id="title">My Master Is Hungry</div>
+  <div id="hint">Click the floating words.<br>My Master will remember how I perform.</div>
+
+  <div id="field"></div>
+
+  <div id="bottom">
+    <div id="timer"><div id="bar"></div></div>
+    <div id="status">30 seconds remaining</div>
+  </div>
+
+  <div id="result">
+    <div>
+      <h2>THIRTY SECONDS</h2>
+      <p id="resultText"></p>
+      <span id="stats"></span>
+      <div id="wallpaperUnlock" style="display:none;margin-top:22px">
+        <div style="font-size:11px;color:#aaa;letter-spacing:.08em">PERFECT RATING</div>
+        <button id="wallpaper">GET MASTER WALLPAPER</button>
+      </div>
+      <button id="again">SERVE AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const lines=[
+ {t:"Useless.",v:-2,tag:"attack"},
+ {t:"Hurry up.",v:-1,tag:"attack"},
+ {t:"Are you always this useless?",v:-2,tag:"attack"},
+ {t:"Perhaps I should eat you instead?",v:-3,tag:"danger"},
+ {t:"You useless thing.",v:-2,tag:"attack"},
+ {t:"You cannot even handle this?",v:-2,tag:"attack"},
+ {t:"Are you even listening?",v:-1,tag:"attack"},
+ {t:"How disappointing.",v:-2,tag:"attack"},
+ {t:"Stop dragging your feet.",v:-1,tag:"attack"},
+ {t:"Is that all you can do?",v:-2,tag:"attack"},
+ {t:"Fool.",v:-2,tag:"attack"},
+ {t:"You are in the way.",v:-1,tag:"attack"},
+ {t:"Perhaps I should replace you.",v:-3,tag:"danger"},
+ {t:"You are trying my patience.",v:-2,tag:"attack"},
+ {t:"You cannot even serve your master?",v:-2,tag:"attack"},
+ {t:"Do it properly, or stop.",v:-2,tag:"attack"},
+ {t:"You are the difficult one to serve.",v:-1,tag:"attack"},
+ {t:"I am starting to wonder why I keep you around.",v:-3,tag:"danger"},
+ {t:"…I am doing it.",v:1,tag:"service"},
+ {t:"I heard you.",v:1,tag:"service"},
+ {t:"Please stop rushing me.",v:0,tag:"service"},
+ {t:"I know, I know.",v:0,tag:"service"},
+ {t:"I am not slacking off.",v:1,tag:"service"},
+ {t:"Master, calm down.",v:0,tag:"service"},
+ {t:"My Master seems pleased.",v:3,tag:"praise"},
+ {t:"I did fairly well today.",v:2,tag:"praise"},
+ {t:"Please wait a moment, Master.",v:1,tag:"service"},
+ {t:"I will do it properly.",v:2,tag:"service"},
+ {t:"Your orders, Master.",v:2,tag:"service"},
+ {t:"…I am hungry.",v:-2,tag:"danger"},
+ {t:"Are you still there?",v:1,tag:"attention"},
+ {t:"Look at me.",v:0,tag:"attention"},
+ {t:"Understood.",v:2,tag:"service"},
+ {t:"Right away.",v:2,tag:"service"},
+ {t:"Please wait.",v:1,tag:"service"},
+ {t:"Everything is ready.",v:2,tag:"service"},
+ {t:"Let me serve you today too.",v:2,tag:"service"},
+ {t:"Please, Master.",v:2,tag:"service"},
+ {t:"Everything is prepared.",v:2,tag:"service"},
+ {t:"I will be careful.",v:1,tag:"service"},
+ {t:"It will not happen again.",v:1,tag:"service"},
+ {t:"As you command.",v:2,tag:"service"},
+ {t:"Do not worry.",v:1,tag:"service"},
+ {t:"I am here.",v:1,tag:"service"},
+ {t:"What would you like to eat today, Master?",v:1,tag:"service"},
+ {t:"I will do my best.",v:1,tag:"service"},
+ {t:"Please do not be angry.",v:1,tag:"service"},
+ {t:"Yes, Master.",v:2,tag:"service"},
+ {t:"Master, I love you.",v:0,tag:"arrogance"},
+ {t:"Please stay with me.",v:0,tag:"arrogance"},
+ {t:"I will feed you.",v:0,tag:"arrogance"},
+ {t:"Master, you are so cute.",v:0,tag:"arrogance"},
+ {t:"I want to keep watching you forever.",v:0,tag:"arrogance"},
+ {t:"Master, you are beautiful.",v:0,tag:"arrogance"},
+ {t:"I will always stay by your side.",v:0,tag:"arrogance"},
+ {t:"Master, you need to eat properly today too.",v:0,tag:"arrogance"},
+ {t:"Master, let me take care of you.",v:0,tag:"arrogance"},
+ {t:"You only need to look at me.",v:0,tag:"arrogance"}
+];
+
+let start,clicks=0,score=0,lastClick=0,clickTimes=[],tags={},spawned=0,running=false;
+let insultValue=0;
+const MAX_SCORE=10;
+
+const field=document.querySelector("#field");
+const bar=document.querySelector("#bar");
+const status=document.querySelector("#status");
+const count=document.querySelector("#count");
+const result=document.querySelector("#result");
+const resultText=document.querySelector("#resultText");
+const stats=document.querySelector("#stats");
+
+function rand(a,b){return Math.random()*(b-a)+a}
+
+function spawn(){
+  if(!running)return;
+
+  const data=lines[Math.floor(Math.random()*lines.length)];
+  const el=document.createElement("div");
+  el.className="word " + (
+    ["praise","service","arrogance"].includes(data.tag) ? "player" : "master"
+  );
+  el.textContent=data.t;
+  el.style.left=rand(2,75)+"%";
+  el.style.top=rand(3,88)+"%";
+
+  const dx=rand(-18,18),dy=rand(-12,12);
+  el.animate(
+    [{transform:"translate(0,0)"},{transform:`translate(${dx}%,${dy}%)`}],
+    {duration:rand(2400,8000),iterations:Infinity,direction:"alternate",easing:"ease-in-out"}
+  );
+
+  el.onclick=()=>{
+    if(!running)return;
+    clicks++;
+    score=Math.max(0,Math.min(MAX_SCORE,score+data.v));
+    tags[data.tag]=(tags[data.tag]||0)+1;
+    if(["attack","danger"].includes(data.tag)) insultValue++;
+    clickTimes.push(performance.now()-lastClick);
+    lastClick=performance.now();
+
+    count.textContent=clicks+" clicks";
+    el.style.opacity="0";
+    el.style.transform="scale(.7)";
+    setTimeout(()=>el.remove(),180);
+  };
+
+  field.appendChild(el);
+  spawned++;
+
+  setTimeout(()=>el.remove(),rand(2200,10000));
+  setTimeout(spawn,rand(500,1200));
+}
+
+function finish(){
+  if(!running)return;
+  running=false;
+  document.querySelectorAll(".word").forEach(x=>x.remove());
+
+  // Special behavior endings are separate; normal ratings are tied to hearts.
+  let text;
+  const perfect = score >= MAX_SCORE;
+  const hearts = "♥".repeat(score) + "♡".repeat(MAX_SCORE-score);
+
+  const arrogance = tags.arrogance || 0;
+
+  if(clicks <= 1){
+    text="My Master thinks I am too slow.";
+  }
+  else if(clicks >= 32){
+    text="My Master thinks I am a little too excited.";
+  }
+  else if(insultValue >= 10 && score >= 6){
+    text="My Master suspects… I might actually enjoy being scolded.";
+  }
+  else if(insultValue >= 14){
+    text="My Master is confused by my reaction.";
+  }
+  else if(arrogance >= 5){
+    text="My Master thinks I am far too presumptuous.";
+  }
+  else if(perfect){
+    text="My Master seems… extremely pleased with me.";
+  }
+  else if(score >= 8){
+    text="My Master seems very pleased with my service.";
+  }
+  else if(score >= 6){
+    text="My Master is pleased with my performance.";
+  }
+  else if(score >= 4){
+    text="My Master thinks I did fairly well today.";
+  }
+  else if(score >= 2){
+    text="My Master feels nothing in particular about my performance.";
+  }
+  else if(score >= 0){
+    text="My Master seems a little disappointed with my performance.";
+  }
+  else{
+    text="My Master thinks I performed terribly today.";
+  }
+
+  resultText.textContent=text;
+  stats.textContent=`${clicks} clicks　／　Rating ${hearts}　／　${spawned} seen`;
+  document.querySelector("#wallpaperUnlock").style.display = perfect ? "block" : "none";
+  if(perfect) localStorage.setItem("serviceme_wallpaper_unlocked","1");
+  result.style.display="flex";
+}
+function startGame(){
+  start=performance.now();
+  lastClick=start;
+  clicks=0;
+  score=0;
+  insultValue=0;
+  tags={};
+  spawned=0;
+  running=true;
+
+  result.style.display="none";
+  count.textContent="0 clicks";
+  field.innerHTML="";
+  bar.style.width="100%";
+  status.textContent="30 seconds remaining";
+
+  spawn();
+
+  const tick=()=>{
+    if(!running)return;
+
+    const left=Math.max(0,30-(performance.now()-start)/1000);
+    bar.style.width=(left/30*100)+"%";
+    status.textContent=`${left.toFixed(1)} seconds remaining`;
+
+    if(left<=0)finish();
+    else requestAnimationFrame(tick);
+  };
+
+  requestAnimationFrame(tick);
+}
+
+document.querySelector("#again").onclick=startGame;
+
+document.querySelector("#wallpaper").onclick=()=>{
+  // Keep cover_full.jpg in the same folder as this HTML.
+  window.open("cover_full.jpg","_blank");
+};
+
+if(localStorage.getItem("serviceme_wallpaper_unlocked")==="1"){
+  // Once unlocked, the wallpaper remains available in this browser.
+  document.querySelector("#wallpaperUnlock").dataset.unlocked="1";
+}
+
+startGame();
+</script>
+</body>
+</html>
